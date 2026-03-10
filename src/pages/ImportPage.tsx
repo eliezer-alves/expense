@@ -25,8 +25,16 @@ export default function ImportPage() {
 
     try {
       const XLSX = await import('xlsx')
-      const buffer = await file.arrayBuffer()
-      const wb = XLSX.read(buffer, { type: 'array' })
+      const isCSV = file.name.toLowerCase().endsWith('.csv')
+      let wb
+      if (isCSV) {
+        // For CSV files, read as UTF-8 text to preserve special characters (accents, emojis, etc.)
+        const text = await file.text()
+        wb = XLSX.read(text, { type: 'string' })
+      } else {
+        const buffer = await file.arrayBuffer()
+        wb = XLSX.read(buffer, { type: 'array', codepage: 65001 })
+      }
       const sheet = wb.Sheets[wb.SheetNames[0]]
       const jsonData = XLSX.utils.sheet_to_json<Record<string, unknown>>(sheet, { defval: '' })
 
