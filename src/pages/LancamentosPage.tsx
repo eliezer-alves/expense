@@ -1,8 +1,10 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useRef, useCallback, useEffect } from 'react'
 import { useData } from '../contexts/DataContext'
 import { formatBRL, formatDate } from '../lib/format'
+import type { Expense } from '../types'
 import {
-  Plus, Search, Trash2, Edit3, X, Check, Download, AlertTriangle
+  Plus, Search, Trash2, Edit3, X, Check, Download, AlertTriangle,
+  Calendar, Tag, User, FileText
 } from 'lucide-react'
 
 function toLocalDatetimeString(date: Date): string {
@@ -32,6 +34,7 @@ async function exportExpensesXLSX(
 }
 
 const CONFIRM_WORD = 'EXCLUIR'
+const LONG_PRESS_MS = 500
 
 export default function LancamentosPage() {
   const { expenses, categories, partners, addExpense, updateExpense, deleteExpense, deleteBatchExpenses } = useData()
@@ -46,6 +49,14 @@ export default function LancamentosPage() {
   const [showBulkDeleteModal, setShowBulkDeleteModal] = useState(false)
   const [bulkDeleteConfirmText, setBulkDeleteConfirmText] = useState('')
   const [bulkDeleting, setBulkDeleting] = useState(false)
+
+  // Detail modal
+  const [detailExpense, setDetailExpense] = useState<Expense | null>(null)
+
+  // Long press tracking
+  const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const longPressTriggered = useRef(false)
+  const touchMoved = useRef(false)
 
   // Form state
   const [formDate, setFormDate] = useState(toLocalDatetimeString(new Date()))
@@ -81,14 +92,14 @@ export default function LancamentosPage() {
   const allFilteredSelected = filtered.length > 0 && filtered.every(e => selectedIds.has(e.id))
   const someSelected = selectedIds.size > 0
 
-  const toggleSelect = (id: string) => {
+  const toggleSelect = useCallback((id: string) => {
     setSelectedIds(prev => {
       const next = new Set(prev)
       if (next.has(id)) next.delete(id)
       else next.add(id)
       return next
     })
-  }
+  }, [])
 
   const toggleSelectAll = () => {
     if (allFilteredSelected) {
@@ -97,6 +108,53 @@ export default function LancamentosPage() {
       setSelectedIds(new Set(filtered.map(e => e.id)))
     }
   }
+
+  // Long press handlers for mobile
+  const handleTouchStart = useCallback((id: string) => {
+    touchMoved.current = false
+    longPressTriggered.current = false
+    longPressTimer.current = setTimeout(() => {
+      longPressTriggered.current = true
+      // Haptic feedback if available
+      if (navigator.vibrate) navigator.vibrate(30)
+      toggleSelect(id)
+    }, LONG_PRESS_MS)
+  }, [toggleSelect])
+
+  const handleTouchMove = useCallback(() => {
+    touchMoved.current = true
+    if (longPressTimer.current) {
+      clearTimeout(longPressTimer.current)
+      longPressTimer.current = null
+    }
+  }, [])
+
+  const handleTouchEnd = useCallback(() => {
+    if (longPressTimer.current) {
+      clearTimeout(longPressTimer.current)
+      longPressTimer.current = null
+    }
+  }, [])
+
+  // Handle tap on expense item (mobile)
+  const handleItemTap = useCallback((e: Expense) => {
+    // If long press was just triggered, don't do anything
+    if (longPressTriggered.current || touchMoved.current) return
+    // If in selection mode, toggle selection instead
+    if (someSelected) {
+      toggleSelect(e.id)
+    } else {
+      // Open detail modal
+      setDetailExpense(e)
+    }
+  }, [someSelected, toggleSelect])
+
+  // Cleanup timer on unmount
+  useEffect(() => {
+    return () => {
+      if (longPressTimer.current) clearTimeout(longPressTimer.current)
+    }
+  }, [])
 
   const resetForm = () => {
     setFormDate(toLocalDatetimeString(new Date()))
@@ -181,10 +239,39 @@ export default function LancamentosPage() {
   const totalFiltered = filtered.reduce((s, e) => s + e.value, 0)
   const selectedTotal = filtered.filter(e => selectedIds.has(e.id)).reduce((s, e) => s + e.value, 0)
 
+  // Whether we're in mobile selection mode (at least 1 selected)
+  const selectionMode = someSelected
+
   return (
     <div className="p-4 sm:p-6 lg:p-8">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-6">
+      {/* Selection mode header (mobile) - replaces normal header when selecting */}
+      {selectionMode && (
+        <div className="lg:hidden flex items-center justify-between gap-3 mb-4 bg-indigo-600 dark:bg-indigo-700 -mx-4 -mt-4 px-4 py-3 sticky top-0 z-20">
+          <div className="flex items-center gap-3">
+            <button onClick={() => setSelectedIds(new Set())} className="p-1 text-white/80 hover:text-white">
+              <X size={20} />
+            </button>
+            <span className="text-white font-semibold text-sm">{selectedIds.size} selecionado(s)</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={toggleSelectAll}
+              className="px-3 py-1.5 text-white/90 text-xs font-medium rounded-lg border border-white/30 hover:bg-white/10"
+            >
+              {allFilteredSelected ? 'Nenhum' : 'Todos'}
+            </button>
+            <button
+              onClick={() => { setShowBulkDeleteModal(true); setBulkDeleteConfirmText('') }}
+              className="p-2 bg-red-500 text-white rounded-lg hover:bg-red-600"
+            >
+              <Trash2 size={16} />
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Normal Header */}
+      <div className={`flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-6 ${selectionMode ? 'hidden lg:flex' : ''}`}>
         <div>
           <h1 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-gray-100">Lancamentos</h1>
           <p className="text-sm text-gray-500 dark:text-gray-400">
@@ -203,8 +290,7 @@ export default function LancamentosPage() {
               className="flex items-center gap-2 px-3 py-2 bg-red-600 text-white rounded-xl text-sm font-medium hover:bg-red-700 transition-colors"
             >
               <Trash2 size={16} />
-              <span className="hidden sm:inline">Excluir ({selectedIds.size})</span>
-              <span className="sm:hidden">{selectedIds.size}</span>
+              Excluir ({selectedIds.size})
             </button>
           )}
           <button
@@ -248,9 +334,9 @@ export default function LancamentosPage() {
         </select>
       </div>
 
-      {/* Select All bar */}
+      {/* Select All bar - always visible on desktop, only in selection mode on mobile */}
       {filtered.length > 0 && (
-        <div className="flex items-center gap-3 mb-3 px-1">
+        <div className={`flex items-center gap-3 mb-3 px-1 ${someSelected ? '' : 'hidden lg:flex'}`}>
           <label className="flex items-center gap-2 cursor-pointer">
             <input
               type="checkbox"
@@ -268,6 +354,13 @@ export default function LancamentosPage() {
         </div>
       )}
 
+      {/* Hint for long press on mobile (only when no selection and has items) */}
+      {!someSelected && filtered.length > 0 && (
+        <p className="lg:hidden text-xs text-gray-400 dark:text-gray-500 mb-3 px-1 italic">
+          Segure um lancamento para selecionar
+        </p>
+      )}
+
       {/* List */}
       <div className="space-y-2">
         {filtered.length === 0 ? (
@@ -280,16 +373,34 @@ export default function LancamentosPage() {
             const par = e.partnerId ? partnerMap.get(e.partnerId) : null
             const isSelected = selectedIds.has(e.id)
             return (
-              <div key={e.id} className={`bg-white dark:bg-gray-800 rounded-xl border p-3 sm:p-4 flex items-center gap-3 hover:shadow-sm transition-all ${
-                isSelected ? 'border-indigo-300 dark:border-indigo-600 bg-indigo-50/50 dark:bg-indigo-900/20' : 'border-gray-100 dark:border-gray-700'
-              }`}>
-                {/* Checkbox */}
-                <input
-                  type="checkbox"
-                  checked={isSelected}
-                  onChange={() => toggleSelect(e.id)}
-                  className="w-4 h-4 rounded border-gray-300 dark:border-gray-600 text-indigo-600 focus:ring-indigo-500 flex-shrink-0 dark:bg-gray-700"
-                />
+              <div
+                key={e.id}
+                className={`bg-white dark:bg-gray-800 rounded-xl border p-3 sm:p-4 flex items-center gap-3 transition-all select-none ${
+                  isSelected
+                    ? 'border-indigo-300 dark:border-indigo-600 bg-indigo-50/50 dark:bg-indigo-900/20 shadow-sm'
+                    : 'border-gray-100 dark:border-gray-700 hover:shadow-sm'
+                }`}
+                // Mobile: long press to select, tap for detail/toggle
+                onTouchStart={() => handleTouchStart(e.id)}
+                onTouchMove={handleTouchMove}
+                onTouchEnd={handleTouchEnd}
+                onClick={() => handleItemTap(e)}
+              >
+                {/* Checkbox: always visible on desktop, on mobile only when in selection mode */}
+                <div className={`flex-shrink-0 ${someSelected ? '' : 'hidden lg:block'}`}>
+                  <input
+                    type="checkbox"
+                    checked={isSelected}
+                    onChange={(ev) => { ev.stopPropagation(); toggleSelect(e.id) }}
+                    onClick={(ev) => ev.stopPropagation()}
+                    className="w-4 h-4 rounded border-gray-300 dark:border-gray-600 text-indigo-600 focus:ring-indigo-500 dark:bg-gray-700"
+                  />
+                </div>
+
+                {/* Selected indicator on mobile (when no checkbox visible, show colored left border) */}
+                {isSelected && !someSelected && (
+                  <div className="lg:hidden w-1 h-10 rounded-full flex-shrink-0 bg-indigo-500" />
+                )}
 
                 {/* Color bar */}
                 <div className="w-1 h-10 rounded-full flex-shrink-0" style={{ backgroundColor: cat?.color || '#94a3b8' }} />
@@ -304,15 +415,15 @@ export default function LancamentosPage() {
                     <span className="inline-block px-1.5 py-0.5 rounded text-xs font-medium text-white" style={{ backgroundColor: cat?.color || '#94a3b8' }}>
                       {cat?.name || 'N/A'}
                     </span>
-                    {par && <span className="text-gray-500 dark:text-gray-400">{par.name}</span>}
+                    {par && <span className="text-gray-500 dark:text-gray-400 hidden sm:inline">{par.name}</span>}
                   </div>
                 </div>
 
                 {/* Value */}
                 <span className="text-sm sm:text-base font-bold text-gray-800 dark:text-gray-200 whitespace-nowrap">{formatBRL(e.value)}</span>
 
-                {/* Actions */}
-                <div className="flex gap-1">
+                {/* Actions - visible on desktop, hidden on mobile */}
+                <div className="hidden lg:flex gap-1" onClick={(ev) => ev.stopPropagation()}>
                   <button onClick={() => openEdit(e.id)} className="p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300">
                     <Edit3 size={14} />
                   </button>
@@ -337,11 +448,112 @@ export default function LancamentosPage() {
         )}
       </div>
 
+      {/* Detail Modal (opens on tap in mobile) */}
+      {detailExpense && (() => {
+        const cat = catMap.get(detailExpense.categoryId)
+        const par = detailExpense.partnerId ? partnerMap.get(detailExpense.partnerId) : null
+        return (
+          <div className="fixed inset-0 bg-black/40 z-50 flex items-end sm:items-center justify-center" onClick={() => setDetailExpense(null)}>
+            <div
+              className="bg-white dark:bg-gray-800 w-full sm:max-w-md sm:rounded-2xl rounded-t-2xl overflow-hidden"
+              onClick={ev => ev.stopPropagation()}
+            >
+              {/* Color header */}
+              <div className="h-2" style={{ backgroundColor: cat?.color || '#94a3b8' }} />
+
+              <div className="p-5 sm:p-6">
+                {/* Close button */}
+                <div className="flex items-center justify-between mb-4">
+                  <span
+                    className="inline-block px-2.5 py-1 rounded-lg text-xs font-semibold text-white"
+                    style={{ backgroundColor: cat?.color || '#94a3b8' }}
+                  >
+                    {cat?.name || 'N/A'}
+                  </span>
+                  <button onClick={() => setDetailExpense(null)} className="p-1 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700">
+                    <X size={18} className="text-gray-500 dark:text-gray-400" />
+                  </button>
+                </div>
+
+                {/* Value - prominent */}
+                <div className="text-center mb-5">
+                  <p className="text-3xl font-bold text-gray-900 dark:text-gray-100">{formatBRL(detailExpense.value)}</p>
+                </div>
+
+                {/* Details */}
+                <div className="space-y-3">
+                  {detailExpense.description && (
+                    <div className="flex items-start gap-3 p-3 bg-gray-50 dark:bg-gray-700/50 rounded-xl">
+                      <FileText size={16} className="text-gray-400 dark:text-gray-500 mt-0.5 flex-shrink-0" />
+                      <div>
+                        <p className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-0.5">Descricao</p>
+                        <p className="text-sm text-gray-800 dark:text-gray-200">{detailExpense.description}</p>
+                      </div>
+                    </div>
+                  )}
+
+                  <div className="flex items-start gap-3 p-3 bg-gray-50 dark:bg-gray-700/50 rounded-xl">
+                    <Calendar size={16} className="text-gray-400 dark:text-gray-500 mt-0.5 flex-shrink-0" />
+                    <div>
+                      <p className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-0.5">Data</p>
+                      <p className="text-sm text-gray-800 dark:text-gray-200">
+                        {new Date(detailExpense.date).toLocaleDateString('pt-BR', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
+                        {' as '}
+                        {new Date(detailExpense.date).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="flex items-start gap-3 p-3 bg-gray-50 dark:bg-gray-700/50 rounded-xl">
+                    <Tag size={16} className="text-gray-400 dark:text-gray-500 mt-0.5 flex-shrink-0" />
+                    <div>
+                      <p className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-0.5">Categoria</p>
+                      <div className="flex items-center gap-2">
+                        <div className="w-3 h-3 rounded-full" style={{ backgroundColor: cat?.color || '#94a3b8' }} />
+                        <p className="text-sm text-gray-800 dark:text-gray-200">{cat?.name || 'N/A'}</p>
+                      </div>
+                    </div>
+                  </div>
+
+                  {par && (
+                    <div className="flex items-start gap-3 p-3 bg-gray-50 dark:bg-gray-700/50 rounded-xl">
+                      <User size={16} className="text-gray-400 dark:text-gray-500 mt-0.5 flex-shrink-0" />
+                      <div>
+                        <p className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-0.5">Parceiro</p>
+                        <p className="text-sm text-gray-800 dark:text-gray-200">{par.name}</p>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* Action buttons */}
+                <div className="flex gap-3 mt-5">
+                  <button
+                    onClick={() => { setDetailExpense(null); openEdit(detailExpense.id) }}
+                    className="flex-1 flex items-center justify-center gap-2 py-2.5 bg-indigo-600 text-white rounded-xl text-sm font-semibold hover:bg-indigo-700 transition-colors"
+                  >
+                    <Edit3 size={14} />
+                    Editar
+                  </button>
+                  <button
+                    onClick={() => { setDetailExpense(null); handleDelete(detailExpense.id) }}
+                    className="flex items-center justify-center gap-2 py-2.5 px-4 bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 rounded-xl text-sm font-semibold hover:bg-red-100 dark:hover:bg-red-900/40 transition-colors"
+                  >
+                    <Trash2 size={14} />
+                    Excluir
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )
+      })()}
+
       {/* Bulk Delete Confirmation Modal (GitHub-style) */}
       {showBulkDeleteModal && (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" onClick={() => setShowBulkDeleteModal(false)}>
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4" onClick={() => setShowBulkDeleteModal(false)}>
           <div
-            className="bg-white dark:bg-gray-800 w-full max-w-md rounded-2xl p-6 shadow-xl"
+            className="bg-white dark:bg-gray-800 w-full sm:max-w-md sm:rounded-2xl rounded-t-2xl p-6 shadow-xl"
             onClick={ev => ev.stopPropagation()}
           >
             <div className="flex items-center gap-3 mb-4">
@@ -495,13 +707,15 @@ export default function LancamentosPage() {
         </div>
       )}
 
-      {/* FAB (mobile) */}
-      <button
-        onClick={openNew}
-        className="lg:hidden fixed bottom-20 right-4 w-14 h-14 bg-indigo-600 text-white rounded-full shadow-lg shadow-indigo-200 dark:shadow-indigo-900 flex items-center justify-center hover:bg-indigo-700 transition-colors z-20"
-      >
-        <Plus size={24} />
-      </button>
+      {/* FAB (mobile) - hide during selection mode */}
+      {!selectionMode && (
+        <button
+          onClick={openNew}
+          className="lg:hidden fixed bottom-20 right-4 w-14 h-14 bg-indigo-600 text-white rounded-full shadow-lg shadow-indigo-200 dark:shadow-indigo-900 flex items-center justify-center hover:bg-indigo-700 transition-colors z-20"
+        >
+          <Plus size={24} />
+        </button>
+      )}
     </div>
   )
 }
