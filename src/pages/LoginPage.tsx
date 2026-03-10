@@ -24,25 +24,25 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-white to-purple-50 flex items-center justify-center p-4">
+    <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-white to-purple-50 dark:from-gray-900 dark:via-gray-900 dark:to-gray-800 flex items-center justify-center p-4">
       <div className="w-full max-w-sm">
         {/* Logo */}
         <div className="text-center mb-8">
           <div className="w-16 h-16 bg-indigo-600 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg shadow-indigo-200">
             <Home size={32} className="text-white" />
           </div>
-          <h1 className="text-2xl font-bold text-gray-900">Casa MCMV</h1>
-          <p className="text-sm text-gray-500 mt-1">Controle de gastos da construcao</p>
+          <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">Casa MCMV</h1>
+          <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">Controle de gastos da construcao</p>
         </div>
 
         {/* Card */}
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
-          <h2 className="text-lg font-semibold text-gray-800 text-center mb-2">Bem-vindo!</h2>
-          <p className="text-sm text-gray-500 text-center mb-6">Faca login para acessar o sistema</p>
+        <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 p-6">
+          <h2 className="text-lg font-semibold text-gray-800 dark:text-gray-100 text-center mb-2">Bem-vindo!</h2>
+          <p className="text-sm text-gray-500 dark:text-gray-400 text-center mb-6">Faca login para acessar o sistema</p>
 
           <button
             onClick={handleGoogleSignIn}
-            className="w-full flex items-center justify-center gap-3 bg-white border border-gray-300 rounded-xl px-4 py-3 text-sm font-medium text-gray-700 hover:bg-gray-50 hover:border-gray-400 transition-all shadow-sm"
+            className="w-full flex items-center justify-center gap-3 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-xl px-4 py-3 text-sm font-medium text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-600 hover:border-gray-400 transition-all shadow-sm"
           >
             <svg width="18" height="18" viewBox="0 0 24 24">
               <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z" fill="#4285F4"/>
@@ -54,7 +54,7 @@ export default function LoginPage() {
           </button>
         </div>
 
-        <p className="text-xs text-gray-400 text-center mt-6">
+        <p className="text-xs text-gray-400 dark:text-gray-500 text-center mt-6">
           Seus dados ficam salvos localmente no navegador
         </p>
       </div>

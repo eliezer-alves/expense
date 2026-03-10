@@ -62,6 +62,12 @@ export class LocalStorageExpenseRepository implements IExpenseRepository {
     saveToStorage(KEYS.expenses, all.filter(e => e.id !== id))
   }
 
+  async deleteBatch(ids: string[]): Promise<void> {
+    const idSet = new Set(ids)
+    const all = getFromStorage<Expense>(KEYS.expenses)
+    saveToStorage(KEYS.expenses, all.filter(e => !idSet.has(e.id)))
+  }
+
   async importBatch(items: Omit<Expense, 'id' | 'createdAt'>[]): Promise<Expense[]> {
     const all = getFromStorage<Expense>(KEYS.expenses)
     const created: Expense[] = items.map(item => ({

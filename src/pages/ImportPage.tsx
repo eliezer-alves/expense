@@ -196,17 +196,17 @@ export default function ImportPage() {
   return (
     <div className="p-4 sm:p-6 lg:p-8">
       <div className="mb-6">
-        <h1 className="text-xl sm:text-2xl font-bold text-gray-900">Importar Planilha</h1>
-        <p className="text-sm text-gray-500">Importe lancamentos a partir de um arquivo CSV ou XLSX</p>
+        <h1 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-gray-100">Importar Planilha</h1>
+        <p className="text-sm text-gray-500 dark:text-gray-400">Importe lancamentos a partir de um arquivo CSV ou XLSX</p>
       </div>
 
       {/* Success */}
       {done && (
-        <div className="mb-6 bg-emerald-50 border border-emerald-200 rounded-xl p-4 flex items-center gap-3">
+        <div className="mb-6 bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800 rounded-xl p-4 flex items-center gap-3">
           <Check size={20} className="text-emerald-600 flex-shrink-0" />
           <div>
-            <p className="text-sm font-medium text-emerald-800">Importacao concluida!</p>
-            <p className="text-xs text-emerald-600">Os lancamentos foram adicionados com sucesso.</p>
+            <p className="text-sm font-medium text-emerald-800 dark:text-emerald-300">Importacao concluida!</p>
+            <p className="text-xs text-emerald-600 dark:text-emerald-400">Os lancamentos foram adicionados com sucesso.</p>
           </div>
           <button onClick={() => setDone(false)} className="ml-auto p-1 rounded hover:bg-emerald-100">
             <X size={14} className="text-emerald-600" />
@@ -216,9 +216,9 @@ export default function ImportPage() {
 
       {/* Error */}
       {error && (
-        <div className="mb-6 bg-red-50 border border-red-200 rounded-xl p-4 flex items-center gap-3">
+        <div className="mb-6 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-xl p-4 flex items-center gap-3">
           <AlertCircle size={20} className="text-red-600 flex-shrink-0" />
-          <p className="text-sm text-red-800">{error}</p>
+          <p className="text-sm text-red-800 dark:text-red-300">{error}</p>
           <button onClick={() => setError('')} className="ml-auto p-1 rounded hover:bg-red-100">
             <X size={14} className="text-red-600" />
           </button>
@@ -230,11 +230,11 @@ export default function ImportPage() {
         <div
           onDragOver={e => e.preventDefault()}
           onDrop={handleDrop}
-          className="border-2 border-dashed border-gray-200 rounded-2xl p-8 sm:p-12 text-center hover:border-indigo-300 transition-colors bg-white"
+          className="border-2 border-dashed border-gray-200 dark:border-gray-600 rounded-2xl p-8 sm:p-12 text-center hover:border-indigo-300 dark:hover:border-indigo-500 transition-colors bg-white dark:bg-gray-800"
         >
-          <Upload size={40} className="mx-auto text-gray-300 mb-4" />
-          <h3 className="text-base font-medium text-gray-700 mb-1">Arraste seu arquivo aqui</h3>
-          <p className="text-sm text-gray-500 mb-4">ou clique para selecionar (CSV, XLSX)</p>
+          <Upload size={40} className="mx-auto text-gray-300 dark:text-gray-600 mb-4" />
+          <h3 className="text-base font-medium text-gray-700 dark:text-gray-300 mb-1">Arraste seu arquivo aqui</h3>
+          <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">ou clique para selecionar (CSV, XLSX)</p>
           <label className="inline-flex items-center gap-2 px-4 py-2.5 bg-indigo-600 text-white rounded-xl text-sm font-medium hover:bg-indigo-700 cursor-pointer transition-colors">
             <FileSpreadsheet size={16} />
             Selecionar Arquivo
@@ -248,7 +248,7 @@ export default function ImportPage() {
               }}
             />
           </label>
-          <div className="mt-6 text-xs text-gray-400 space-y-1">
+          <div className="mt-6 text-xs text-gray-400 dark:text-gray-500 space-y-1">
             <p>Formatos aceitos: CSV, XLSX, XLS</p>
             <p>O sistema detecta automaticamente as colunas: DATA, VALOR, CATEGORIA, DESCRICAO</p>
           </div>
@@ -257,42 +257,42 @@ export default function ImportPage() {
 
       {/* Preview */}
       {parsedRows.length > 0 && (
-        <div className="bg-white rounded-2xl border border-gray-100 p-4 sm:p-5">
+        <div className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-100 dark:border-gray-700 p-4 sm:p-5">
           <div className="flex items-center justify-between mb-4">
             <div>
-              <h2 className="text-sm font-semibold text-gray-700">Pre-visualizacao</h2>
-              <p className="text-xs text-gray-400">{parsedRows.length} lancamento(s) encontrado(s) em {fileName}</p>
+              <h2 className="text-sm font-semibold text-gray-700 dark:text-gray-200">Pre-visualizacao</h2>
+              <p className="text-xs text-gray-400 dark:text-gray-500">{parsedRows.length} lancamento(s) encontrado(s) em {fileName}</p>
             </div>
-            <button onClick={() => setParsedRows([])} className="text-xs text-gray-500 hover:text-gray-700">
+            <button onClick={() => setParsedRows([])} className="text-xs text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200">
               Cancelar
             </button>
           </div>
 
           <div className="overflow-x-auto max-h-96 overflow-y-auto mb-4">
             <table className="w-full text-xs">
-              <thead className="sticky top-0 bg-white">
-                <tr className="border-b border-gray-100">
-                  <th className="text-left py-2 px-2 text-gray-500 font-medium">Data</th>
-                  <th className="text-right py-2 px-2 text-gray-500 font-medium">Valor</th>
-                  <th className="text-left py-2 px-2 text-gray-500 font-medium">Categoria</th>
-                  <th className="text-left py-2 px-2 text-gray-500 font-medium hidden sm:table-cell">Descricao</th>
+              <thead className="sticky top-0 bg-white dark:bg-gray-800">
+                <tr className="border-b border-gray-100 dark:border-gray-700">
+                  <th className="text-left py-2 px-2 text-gray-500 dark:text-gray-400 font-medium">Data</th>
+                  <th className="text-right py-2 px-2 text-gray-500 dark:text-gray-400 font-medium">Valor</th>
+                  <th className="text-left py-2 px-2 text-gray-500 dark:text-gray-400 font-medium">Categoria</th>
+                  <th className="text-left py-2 px-2 text-gray-500 dark:text-gray-400 font-medium hidden sm:table-cell">Descricao</th>
                 </tr>
               </thead>
               <tbody>
                 {parsedRows.slice(0, 50).map((r, i) => (
-                  <tr key={i} className="border-b border-gray-50">
-                    <td className="py-1.5 px-2 text-gray-600 whitespace-nowrap">{new Date(r.date).toLocaleDateString('pt-BR')}</td>
-                    <td className="py-1.5 px-2 text-right font-medium text-gray-800">
+                  <tr key={i} className="border-b border-gray-50 dark:border-gray-700">
+                    <td className="py-1.5 px-2 text-gray-600 dark:text-gray-400 whitespace-nowrap">{new Date(r.date).toLocaleDateString('pt-BR')}</td>
+                    <td className="py-1.5 px-2 text-right font-medium text-gray-800 dark:text-gray-200">
                       {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(r.value)}
                     </td>
-                    <td className="py-1.5 px-2 text-gray-600">{r.category || '-'}</td>
-                    <td className="py-1.5 px-2 text-gray-600 max-w-xs truncate hidden sm:table-cell">{r.description || '-'}</td>
+                    <td className="py-1.5 px-2 text-gray-600 dark:text-gray-400">{r.category || '-'}</td>
+                    <td className="py-1.5 px-2 text-gray-600 dark:text-gray-400 max-w-xs truncate hidden sm:table-cell">{r.description || '-'}</td>
                   </tr>
                 ))}
               </tbody>
             </table>
             {parsedRows.length > 50 && (
-              <p className="text-xs text-gray-400 text-center py-2">Mostrando 50 de {parsedRows.length} registros</p>
+              <p className="text-xs text-gray-400 dark:text-gray-500 text-center py-2">Mostrando 50 de {parsedRows.length} registros</p>
             )}
           </div>
 

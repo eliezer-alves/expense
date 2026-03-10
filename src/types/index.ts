@@ -46,6 +46,7 @@ export interface IExpenseRepository {
   create(expense: Omit<Expense, 'id' | 'createdAt'>): Promise<Expense>
   update(id: string, expense: Partial<Omit<Expense, 'id' | 'createdAt'>>): Promise<Expense>
   delete(id: string): Promise<void>
+  deleteBatch(ids: string[]): Promise<void>
   importBatch(expenses: Omit<Expense, 'id' | 'createdAt'>[]): Promise<Expense[]>
   exportAll(): Promise<Expense[]>
 }

@@ -2,7 +2,7 @@ import { useState, useMemo } from 'react'
 import { useData } from '../contexts/DataContext'
 import { formatBRL, formatDate } from '../lib/format'
 import {
-  Plus, Search, Trash2, Edit3, X, Check, Download
+  Plus, Search, Trash2, Edit3, X, Check, Download, AlertTriangle
 } from 'lucide-react'
 
 function toLocalDatetimeString(date: Date): string {
@@ -31,13 +31,21 @@ async function exportExpensesXLSX(
   XLSX.writeFile(wb, 'lancamentos-casa-mcmv.xlsx')
 }
 
+const CONFIRM_WORD = 'EXCLUIR'
+
 export default function LancamentosPage() {
-  const { expenses, categories, partners, addExpense, updateExpense, deleteExpense } = useData()
+  const { expenses, categories, partners, addExpense, updateExpense, deleteExpense, deleteBatchExpenses } = useData()
   const [showForm, setShowForm] = useState(false)
   const [editId, setEditId] = useState<string | null>(null)
   const [search, setSearch] = useState('')
   const [filterCategory, setFilterCategory] = useState('')
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null)
+
+  // Bulk selection
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
+  const [showBulkDeleteModal, setShowBulkDeleteModal] = useState(false)
+  const [bulkDeleteConfirmText, setBulkDeleteConfirmText] = useState('')
+  const [bulkDeleting, setBulkDeleting] = useState(false)
 
   // Form state
   const [formDate, setFormDate] = useState(toLocalDatetimeString(new Date()))
@@ -68,6 +76,27 @@ export default function LancamentosPage() {
       return true
     })
   }, [expenses, search, filterCategory, catMap, partnerMap])
+
+  // Selection helpers
+  const allFilteredSelected = filtered.length > 0 && filtered.every(e => selectedIds.has(e.id))
+  const someSelected = selectedIds.size > 0
+
+  const toggleSelect = (id: string) => {
+    setSelectedIds(prev => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }
+
+  const toggleSelectAll = () => {
+    if (allFilteredSelected) {
+      setSelectedIds(new Set())
+    } else {
+      setSelectedIds(new Set(filtered.map(e => e.id)))
+    }
+  }
 
   const resetForm = () => {
     setFormDate(toLocalDatetimeString(new Date()))
@@ -122,6 +151,20 @@ export default function LancamentosPage() {
   const handleDelete = async (id: string) => {
     await deleteExpense(id)
     setConfirmDelete(null)
+    setSelectedIds(prev => { const next = new Set(prev); next.delete(id); return next })
+  }
+
+  const handleBulkDelete = async () => {
+    if (bulkDeleteConfirmText !== CONFIRM_WORD) return
+    setBulkDeleting(true)
+    try {
+      await deleteBatchExpenses(Array.from(selectedIds))
+      setSelectedIds(new Set())
+      setShowBulkDeleteModal(false)
+      setBulkDeleteConfirmText('')
+    } finally {
+      setBulkDeleting(false)
+    }
   }
 
   const handleExport = () => {
@@ -136,19 +179,37 @@ export default function LancamentosPage() {
   }
 
   const totalFiltered = filtered.reduce((s, e) => s + e.value, 0)
+  const selectedTotal = filtered.filter(e => selectedIds.has(e.id)).reduce((s, e) => s + e.value, 0)
 
   return (
     <div className="p-4 sm:p-6 lg:p-8">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-6">
         <div>
-          <h1 className="text-xl sm:text-2xl font-bold text-gray-900">Lancamentos</h1>
-          <p className="text-sm text-gray-500">{filtered.length} registro(s) - Total: {formatBRL(totalFiltered)}</p>
+          <h1 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-gray-100">Lancamentos</h1>
+          <p className="text-sm text-gray-500 dark:text-gray-400">
+            {filtered.length} registro(s) - Total: {formatBRL(totalFiltered)}
+            {someSelected && (
+              <span className="ml-2 text-indigo-600 dark:text-indigo-400 font-medium">
+                ({selectedIds.size} selecionado(s) - {formatBRL(selectedTotal)})
+              </span>
+            )}
+          </p>
         </div>
         <div className="flex gap-2">
+          {someSelected && (
+            <button
+              onClick={() => { setShowBulkDeleteModal(true); setBulkDeleteConfirmText('') }}
+              className="flex items-center gap-2 px-3 py-2 bg-red-600 text-white rounded-xl text-sm font-medium hover:bg-red-700 transition-colors"
+            >
+              <Trash2 size={16} />
+              <span className="hidden sm:inline">Excluir ({selectedIds.size})</span>
+              <span className="sm:hidden">{selectedIds.size}</span>
+            </button>
+          )}
           <button
             onClick={handleExport}
-            className="flex items-center gap-2 px-3 py-2 bg-white border border-gray-200 rounded-xl text-sm font-medium text-gray-700 hover:bg-gray-50"
+            className="flex items-center gap-2 px-3 py-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600 rounded-xl text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700"
           >
             <Download size={16} />
             <span className="hidden sm:inline">Exportar</span>
@@ -166,19 +227,19 @@ export default function LancamentosPage() {
       {/* Filters */}
       <div className="flex flex-col sm:flex-row gap-3 mb-4">
         <div className="relative flex-1">
-          <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+          <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 dark:text-gray-500" />
           <input
             type="text"
             placeholder="Buscar lancamentos..."
             value={search}
             onChange={e => setSearch(e.target.value)}
-            className="w-full pl-9 pr-3 py-2.5 bg-white border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none"
+            className="w-full pl-9 pr-3 py-2.5 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600 rounded-xl text-sm text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none"
           />
         </div>
         <select
           value={filterCategory}
           onChange={e => setFilterCategory(e.target.value)}
-          className="px-3 py-2.5 bg-white border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none"
+          className="px-3 py-2.5 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600 rounded-xl text-sm text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none"
         >
           <option value="">Todas categorias</option>
           {categories.map(c => (
@@ -187,54 +248,85 @@ export default function LancamentosPage() {
         </select>
       </div>
 
+      {/* Select All bar */}
+      {filtered.length > 0 && (
+        <div className="flex items-center gap-3 mb-3 px-1">
+          <label className="flex items-center gap-2 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={allFilteredSelected}
+              onChange={toggleSelectAll}
+              className="w-4 h-4 rounded border-gray-300 dark:border-gray-600 text-indigo-600 focus:ring-indigo-500 dark:bg-gray-700"
+            />
+            <span className="text-xs font-medium text-gray-500 dark:text-gray-400">Selecionar todos</span>
+          </label>
+          {someSelected && (
+            <button onClick={() => setSelectedIds(new Set())} className="text-xs text-gray-400 hover:text-gray-600 dark:hover:text-gray-300">
+              Limpar selecao
+            </button>
+          )}
+        </div>
+      )}
+
       {/* List */}
       <div className="space-y-2">
         {filtered.length === 0 ? (
           <div className="text-center py-16">
-            <p className="text-gray-400 text-sm">Nenhum lancamento encontrado</p>
+            <p className="text-gray-400 dark:text-gray-500 text-sm">Nenhum lancamento encontrado</p>
           </div>
         ) : (
           filtered.map(e => {
             const cat = catMap.get(e.categoryId)
             const par = e.partnerId ? partnerMap.get(e.partnerId) : null
+            const isSelected = selectedIds.has(e.id)
             return (
-              <div key={e.id} className="bg-white rounded-xl border border-gray-100 p-3 sm:p-4 flex items-center gap-3 hover:shadow-sm transition-shadow">
+              <div key={e.id} className={`bg-white dark:bg-gray-800 rounded-xl border p-3 sm:p-4 flex items-center gap-3 hover:shadow-sm transition-all ${
+                isSelected ? 'border-indigo-300 dark:border-indigo-600 bg-indigo-50/50 dark:bg-indigo-900/20' : 'border-gray-100 dark:border-gray-700'
+              }`}>
+                {/* Checkbox */}
+                <input
+                  type="checkbox"
+                  checked={isSelected}
+                  onChange={() => toggleSelect(e.id)}
+                  className="w-4 h-4 rounded border-gray-300 dark:border-gray-600 text-indigo-600 focus:ring-indigo-500 flex-shrink-0 dark:bg-gray-700"
+                />
+
                 {/* Color bar */}
                 <div className="w-1 h-10 rounded-full flex-shrink-0" style={{ backgroundColor: cat?.color || '#94a3b8' }} />
 
                 {/* Info */}
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 mb-0.5">
-                    <span className="text-sm font-medium text-gray-800 truncate">{e.description || 'Sem descricao'}</span>
+                    <span className="text-sm font-medium text-gray-800 dark:text-gray-200 truncate">{e.description || 'Sem descricao'}</span>
                   </div>
-                  <div className="flex items-center gap-2 text-xs text-gray-400 flex-wrap">
+                  <div className="flex items-center gap-2 text-xs text-gray-400 dark:text-gray-500 flex-wrap">
                     <span>{formatDate(e.date)}</span>
                     <span className="inline-block px-1.5 py-0.5 rounded text-xs font-medium text-white" style={{ backgroundColor: cat?.color || '#94a3b8' }}>
                       {cat?.name || 'N/A'}
                     </span>
-                    {par && <span className="text-gray-500">{par.name}</span>}
+                    {par && <span className="text-gray-500 dark:text-gray-400">{par.name}</span>}
                   </div>
                 </div>
 
                 {/* Value */}
-                <span className="text-sm sm:text-base font-bold text-gray-800 whitespace-nowrap">{formatBRL(e.value)}</span>
+                <span className="text-sm sm:text-base font-bold text-gray-800 dark:text-gray-200 whitespace-nowrap">{formatBRL(e.value)}</span>
 
                 {/* Actions */}
                 <div className="flex gap-1">
-                  <button onClick={() => openEdit(e.id)} className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-400 hover:text-gray-600">
+                  <button onClick={() => openEdit(e.id)} className="p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300">
                     <Edit3 size={14} />
                   </button>
                   {confirmDelete === e.id ? (
                     <div className="flex gap-1">
-                      <button onClick={() => handleDelete(e.id)} className="p-1.5 rounded-lg bg-red-50 text-red-500 hover:bg-red-100">
+                      <button onClick={() => handleDelete(e.id)} className="p-1.5 rounded-lg bg-red-50 dark:bg-red-900/30 text-red-500 hover:bg-red-100 dark:hover:bg-red-900/50">
                         <Check size={14} />
                       </button>
-                      <button onClick={() => setConfirmDelete(null)} className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-400">
+                      <button onClick={() => setConfirmDelete(null)} className="p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-400">
                         <X size={14} />
                       </button>
                     </div>
                   ) : (
-                    <button onClick={() => setConfirmDelete(e.id)} className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-400 hover:text-red-500">
+                    <button onClick={() => setConfirmDelete(e.id)} className="p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-400 hover:text-red-500">
                       <Trash2 size={14} />
                     </button>
                   )}
@@ -245,38 +337,94 @@ export default function LancamentosPage() {
         )}
       </div>
 
+      {/* Bulk Delete Confirmation Modal (GitHub-style) */}
+      {showBulkDeleteModal && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" onClick={() => setShowBulkDeleteModal(false)}>
+          <div
+            className="bg-white dark:bg-gray-800 w-full max-w-md rounded-2xl p-6 shadow-xl"
+            onClick={ev => ev.stopPropagation()}
+          >
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-10 h-10 bg-red-100 dark:bg-red-900/30 rounded-full flex items-center justify-center flex-shrink-0">
+                <AlertTriangle size={20} className="text-red-600 dark:text-red-400" />
+              </div>
+              <div>
+                <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Excluir lancamentos</h2>
+                <p className="text-sm text-gray-500 dark:text-gray-400">Esta acao nao pode ser desfeita.</p>
+              </div>
+            </div>
+
+            <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-xl p-3 mb-4">
+              <p className="text-sm text-red-800 dark:text-red-300">
+                Voce esta prestes a excluir <strong>{selectedIds.size} lancamento(s)</strong> no valor total de <strong>{formatBRL(selectedTotal)}</strong>.
+              </p>
+            </div>
+
+            <div className="mb-4">
+              <label className="text-sm text-gray-700 dark:text-gray-300 block mb-2">
+                Para confirmar, digite <strong className="font-mono bg-gray-100 dark:bg-gray-700 px-1.5 py-0.5 rounded text-red-600 dark:text-red-400">{CONFIRM_WORD}</strong> abaixo:
+              </label>
+              <input
+                type="text"
+                value={bulkDeleteConfirmText}
+                onChange={ev => setBulkDeleteConfirmText(ev.target.value)}
+                placeholder={CONFIRM_WORD}
+                className="w-full px-3 py-2.5 bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-xl text-sm text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-red-500 focus:border-red-500 outline-none font-mono"
+                autoFocus
+              />
+            </div>
+
+            <div className="flex gap-3">
+              <button
+                onClick={() => setShowBulkDeleteModal(false)}
+                className="flex-1 py-2.5 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-xl text-sm font-medium hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={handleBulkDelete}
+                disabled={bulkDeleteConfirmText !== CONFIRM_WORD || bulkDeleting}
+                className="flex-1 py-2.5 bg-red-600 text-white rounded-xl text-sm font-semibold hover:bg-red-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+              >
+                {bulkDeleting ? 'Excluindo...' : `Excluir ${selectedIds.size} item(ns)`}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Form Modal */}
       {showForm && (
         <div className="fixed inset-0 bg-black/40 z-50 flex items-end sm:items-center justify-center" onClick={() => setShowForm(false)}>
           <div
-            className="bg-white w-full sm:max-w-md sm:rounded-2xl rounded-t-2xl p-5 sm:p-6 max-h-screen overflow-y-auto"
+            className="bg-white dark:bg-gray-800 w-full sm:max-w-md sm:rounded-2xl rounded-t-2xl p-5 sm:p-6 max-h-screen overflow-y-auto"
             onClick={e => e.stopPropagation()}
           >
             <div className="flex items-center justify-between mb-4">
-              <h2 className="text-lg font-semibold text-gray-800">{editId ? 'Editar Lancamento' : 'Novo Lancamento'}</h2>
-              <button onClick={() => setShowForm(false)} className="p-1 rounded-lg hover:bg-gray-100">
-                <X size={18} className="text-gray-500" />
+              <h2 className="text-lg font-semibold text-gray-800 dark:text-gray-100">{editId ? 'Editar Lancamento' : 'Novo Lancamento'}</h2>
+              <button onClick={() => setShowForm(false)} className="p-1 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700">
+                <X size={18} className="text-gray-500 dark:text-gray-400" />
               </button>
             </div>
 
             <div className="space-y-4">
               {/* Value - big and prominent */}
               <div>
-                <label className="text-xs font-medium text-gray-500 mb-1 block">Valor (R$)</label>
+                <label className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-1 block">Valor (R$)</label>
                 <input
                   type="text"
                   inputMode="decimal"
                   placeholder="0,00"
                   value={formValue}
                   onChange={e => setFormValue(e.target.value)}
-                  className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-2xl font-bold text-gray-800 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none text-center"
+                  className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-xl text-2xl font-bold text-gray-800 dark:text-gray-100 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none text-center"
                   autoFocus
                 />
               </div>
 
               {/* Category */}
               <div>
-                <label className="text-xs font-medium text-gray-500 mb-1 block">Categoria</label>
+                <label className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-1 block">Categoria</label>
                 <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
                   {categories.map(c => (
                     <button
@@ -285,7 +433,7 @@ export default function LancamentosPage() {
                       className={`px-2 py-2 rounded-xl text-xs font-medium border-2 transition-all ${
                         formCategory === c.id
                           ? 'border-current text-white'
-                          : 'border-gray-100 text-gray-600 hover:border-gray-200'
+                          : 'border-gray-100 dark:border-gray-600 text-gray-600 dark:text-gray-400 hover:border-gray-200 dark:hover:border-gray-500'
                       }`}
                       style={formCategory === c.id ? { backgroundColor: c.color, borderColor: c.color } : {}}
                     >
@@ -297,23 +445,23 @@ export default function LancamentosPage() {
 
               {/* Date */}
               <div>
-                <label className="text-xs font-medium text-gray-500 mb-1 block">Data e Hora</label>
+                <label className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-1 block">Data e Hora</label>
                 <input
                   type="datetime-local"
                   value={formDate}
                   onChange={e => setFormDate(e.target.value)}
-                  className="w-full px-3 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none"
+                  className="w-full px-3 py-2.5 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-xl text-sm text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none"
                 />
               </div>
 
               {/* Partner */}
               {partners.length > 0 && (
                 <div>
-                  <label className="text-xs font-medium text-gray-500 mb-1 block">Parceiro/Estabelecimento</label>
+                  <label className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-1 block">Parceiro/Estabelecimento</label>
                   <select
                     value={formPartner}
                     onChange={e => setFormPartner(e.target.value)}
-                    className="w-full px-3 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none"
+                    className="w-full px-3 py-2.5 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-xl text-sm text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none"
                   >
                     <option value="">Nenhum</option>
                     {partners.map(p => (
@@ -325,13 +473,13 @@ export default function LancamentosPage() {
 
               {/* Description */}
               <div>
-                <label className="text-xs font-medium text-gray-500 mb-1 block">Descricao</label>
+                <label className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-1 block">Descricao</label>
                 <input
                   type="text"
                   placeholder="Ex: 10 sacos de cimento"
                   value={formDescription}
                   onChange={e => setFormDescription(e.target.value)}
-                  className="w-full px-3 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none"
+                  className="w-full px-3 py-2.5 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-xl text-sm text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none"
                 />
               </div>
 
@@ -350,7 +498,7 @@ export default function LancamentosPage() {
       {/* FAB (mobile) */}
       <button
         onClick={openNew}
-        className="lg:hidden fixed bottom-20 right-4 w-14 h-14 bg-indigo-600 text-white rounded-full shadow-lg shadow-indigo-200 flex items-center justify-center hover:bg-indigo-700 transition-colors z-20"
+        className="lg:hidden fixed bottom-20 right-4 w-14 h-14 bg-indigo-600 text-white rounded-full shadow-lg shadow-indigo-200 dark:shadow-indigo-900 flex items-center justify-center hover:bg-indigo-700 transition-colors z-20"
       >
         <Plus size={24} />
       </button>

@@ -11,6 +11,7 @@ interface DataContextType {
   addExpense: (data: Omit<Expense, 'id' | 'createdAt'>) => Promise<Expense>
   updateExpense: (id: string, data: Partial<Omit<Expense, 'id' | 'createdAt'>>) => Promise<void>
   deleteExpense: (id: string) => Promise<void>
+  deleteBatchExpenses: (ids: string[]) => Promise<void>
   importExpenses: (items: Omit<Expense, 'id' | 'createdAt'>[]) => Promise<Expense[]>
   // Categories
   addCategory: (data: Omit<Category, 'id'>) => Promise<Category>
@@ -67,6 +68,12 @@ export function DataProvider({ children }: { children: ReactNode }) {
     setExpenses(prev => prev.filter(e => e.id !== id))
   }, [])
 
+  const deleteBatchExpenses = useCallback(async (ids: string[]) => {
+    await expenseRepo.deleteBatch(ids)
+    const idSet = new Set(ids)
+    setExpenses(prev => prev.filter(e => !idSet.has(e.id)))
+  }, [])
+
   const importExpenses = useCallback(async (items: Omit<Expense, 'id' | 'createdAt'>[]) => {
     const created = await expenseRepo.importBatch(items)
     await refresh()
@@ -108,7 +115,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
   return (
     <DataContext.Provider value={{
       expenses, categories, partners, loading,
-      addExpense, updateExpense, deleteExpense, importExpenses,
+      addExpense, updateExpense, deleteExpense, deleteBatchExpenses, importExpenses,
       addCategory, updateCategory, deleteCategory,
       addPartner, updatePartner, deletePartner,
       refresh,
