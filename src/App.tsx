@@ -1,14 +1,14 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
-import { AuthProvider, useAuth } from './contexts/AuthContext'
-import { DataProvider } from './contexts/DataContext'
-import { ThemeProvider } from './contexts/ThemeContext'
-import AppLayout from './components/layout/AppLayout'
-import LoginPage from './pages/LoginPage'
-import DashboardPage from './pages/DashboardPage'
-import LancamentosPage from './pages/LancamentosPage'
-import AdminCategoriasPage from './pages/AdminCategoriasPage'
-import AdminParceirosPage from './pages/AdminParceirosPage'
-import ImportPage from './pages/ImportPage'
+import { AuthProvider, useAuth } from '@/features/auth'
+import { ThemeProvider } from '@/shared/hooks/useTheme'
+import { DataLoader } from '@/shared/components/DataLoader'
+import AppLayout from '@/shared/components/AppLayout'
+import { LoginPage } from '@/features/auth'
+import { DashboardPage } from '@/features/dashboard'
+import { ExpenseList } from '@/features/expenses'
+import { CategoriesPage } from '@/features/categories'
+import { PartnersPage } from '@/features/partners'
+import { ImportPage } from '@/features/import'
 import './App.css'
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
@@ -32,16 +32,16 @@ function AppRoutes() {
       <Route
         element={
           <ProtectedRoute>
-            <DataProvider>
+            <DataLoader>
               <AppLayout />
-            </DataProvider>
+            </DataLoader>
           </ProtectedRoute>
         }
       >
         <Route path="/dashboard" element={<DashboardPage />} />
-        <Route path="/lancamentos" element={<LancamentosPage />} />
-        <Route path="/admin/categorias" element={<AdminCategoriasPage />} />
-        <Route path="/admin/parceiros" element={<AdminParceirosPage />} />
+        <Route path="/lancamentos" element={<ExpenseList />} />
+        <Route path="/admin/categorias" element={<CategoriesPage />} />
+        <Route path="/admin/parceiros" element={<PartnersPage />} />
         <Route path="/importar" element={<ImportPage />} />
       </Route>
       <Route path="*" element={<Navigate to="/dashboard" replace />} />
